@@ -41,7 +41,7 @@ module l2vpn {
       tailf:info "Device name. The device must be configured by QOS service";
       // reference only devices configured by QoS, not general device list
       type leafref {
-        path "/qos:qos[qos:service-id=curent()/../../link/qos-service-id]/qos:device";
+        path "/qos:qos[qos:service-id=current()/../../link/qos-service-id]/qos:device";
       }
     }
     leaf interface-id {
