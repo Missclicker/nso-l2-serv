@@ -2,6 +2,10 @@ module qos {
   namespace "http://com/example/qos";
   prefix qos;
 
+  import tailf-common {
+    prefix tailf;
+  }
+
   import ietf-inet-types {
     prefix inet;
   }
