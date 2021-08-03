@@ -14,31 +14,61 @@ class ServiceCallbacks(Service):
     def cb_create(self, tctx, root, service, proplist):
         self.log.info('Service create(service=', service._path, ')')
 
+        # "vars" will be used to store all variables need for the l2vpn-template XML file
         vars = ncs.template.Variables()
-        vars.add('DUMMY', '127.0.0.1')
         template = ncs.template.Template(service)
+        # qos_service_id contains the ID of the referenced QoS service instance
+        # any dash in elements defined in the yang module are replaced by underscode in maapi
+        qos_service_id = service.link.qos_service_id
+        # MAAGIC is used to walk through the NSO databse.
+        # starting from root
+        # then we enter the referenced qos services instance data by .qos[qos_service_id]
+        # in the end the variable qos_policy_name contains the policy-name defined in the qos service instance
+        qos_policy_name = root.qos[qos_service_id].policy_name
+        # MAAGIC is an easy to use SDK to walk through NSO's data
+        # for more convenience, we shorten the paths
+        # e.g.: the variabel "ad" is equal to root.l2vpn[{current-instance-id}].access_device
+        # thus, "ad" contains the path of the access-device container
+        ad = service.access_device
+        dd = service.delivery_device
+        link = service.link
+        # FILL CONFIGURATION TEMPLATE FOR ACCESS DEVICE
+        # iface description is generated using multiple input parameters define the yang instance
+        iface_description = "-"
+        iface_d_params = ("service", service.service_id, "svc", "to", dd.device_id, dd.interface_id,
+                          str(dd.vlan_id))
+        iface_description = iface_description.join(iface_d_params)
+        vars.add('DEVICE_NAME', ad.device_id)
+        vars.add('VC_CLASS', link.vc_class)
+        vars.add('INTERFACE_ID', ad.interface_id)
+        vars.add('SERVICE_ETHERNET_INSTANCE_ID', ad.instance_id)
+        vars.add('QOS_POLICY_NAME', qos_policy_name)
+        vars.add('VLAN_ID', ad.vlan_id)
+        vars.add('REMOTE_IP', dd.ip_address)
+        vars.add('VC_ID',link.vc_id)
+        vars.add('VC_CLASS',link.vc_class)
+        vars.add('IFACE_DESCRIPTION', iface_description)
+        # after collecting all required parameters,
+        # they are applied in the l2vpn-template to the candidate configuration of NSO
         template.apply('l2vpn-template', vars)
-
-    # The pre_modification() and post_modification() callbacks are optional,
-    # and are invoked outside FASTMAP. pre_modification() is invoked before
-    # create, update, or delete of the service, as indicated by the enum
-    # ncs_service_operation op parameter. Conversely
-    # post_modification() is invoked after create, update, or delete
-    # of the service. These functions can be useful e.g. for
-    # allocations that should be stored and existing also when the
-    # service instance is removed.
-
-    # @Service.pre_lock_create
-    # def cb_pre_lock_create(self, tctx, root, service, proplist):
-    #     self.log.info('Service plcreate(service=', service._path, ')')
-
-    # @Service.pre_modification
-    # def cb_pre_modification(self, tctx, op, kp, root, proplist):
-    #     self.log.info('Service premod(service=', kp, ')')
-
-    # @Service.post_modification
-    # def cb_post_modification(self, tctx, op, kp, root, proplist):
-    #     self.log.info('Service premod(service=', kp, ')')
+        # FILL CONFIGURATION TEMPLATE FOR DELIVERY DEVICE
+        iface_description = "-"
+        iface_d_params = ("service", service.service_id, "svc", "to", ad.device_id, ad.interface_id,
+                          str(ad.vlan_id))
+        iface_description = iface_description.join(iface_d_params)
+        vars.add('DEVICE_NAME', dd.device_id)
+        vars.add('VC_CLASS', link.vc_class)
+        vars.add('INTERFACE_ID', dd.interface_id)
+        vars.add('SERVICE_ETHERNET_INSTANCE_ID', dd.instance_id)
+        vars.add('QOS_POLICY_NAME', qos_policy_name)
+        vars.add('VLAN_ID', dd.vlan_id)
+        vars.add('REMOTE_IP', ad.ip_address)
+        vars.add('VC_ID',link.vc_id)
+        vars.add('VC_CLASS',link.vc_class)
+        vars.add('IFACE_DESCRIPTION', iface_description)
+        # The new recollected variables are applied in the template to the candidate configuration
+        # As you see, we can call the same template multiple times with different parameters for different devices
+        template.apply('l2vpn-template', vars)
 
 
 # ---------------------------------------------
