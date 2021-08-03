@@ -10,8 +10,14 @@ module qos {
   }
 
   list qos {
-    key name;
 
+    key service-id;
+    leaf service-id {
+        // thanks to tailf:info, "Unique service id" description will be printed in the NSO CLI
+        tailf:info "Unique service id";
+        tailf:cli-allow-range;
+        type string;
+    }
     uses ncs:service-data;
     ncs:servicepoint "qos";
 
@@ -21,14 +27,27 @@ module qos {
 
     // may replace this with other ways of refering to the devices.
     leaf-list device {
+    min-elements 2;
+    tailf:info "device name";
       type leafref {
         path "/ncs:devices/ncs:device/ncs:name";
       }
     }
 
-    // replace with your own stuff here
-    leaf dummy {
-      type inet:ipv4-address;
+    leaf policy-name {
+        tailf:info "Policy name";
+        // "mandatory true" means that this leaf must be filled. Otherwise NSO won't accept the service instantiation
+        mandatory true;
+        type string;
+    }
+
+    leaf average-bit-rate {
+        tailf:info "Target Bit Rate (bits per second), the value needs to be a multiple of 8000";
+        mandatory true;
+        type uint32 {
+            // the predefined type unint32 is locally refined
+            range "8000..max";
+        }
     }
   }
 }
