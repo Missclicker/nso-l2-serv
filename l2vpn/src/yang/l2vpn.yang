@@ -13,37 +13,111 @@ module l2vpn {
     prefix ncs;
   }
 
-  description
-    "Bla bla...";
-
-  revision 2016-01-01 {
-    description
-      "Initial revision.";
+  import qos {
+    prefix qos;
   }
+
+  description "Training NSO: L2VPN Service";
+
+  revision 2021-08-03 {
+    description
+      "L2VPN lab";
+  }
+
+  typedef vc-range {
+    type uint32 {
+      range "10000..20000";
+    }
+  }
+  typedef vlan-range {
+    type uint32 {
+      range "100..300";
+    }
+  }
+
+  grouping device-config {
+    leaf device-id {
+      mandatory true;
+      tailf:info "Device name. The device must be configured by QOS service";
+      // reference only devices configured by QoS, not general device list
+      type leafref {
+        path "/qos:qos[qos:service-id=curent()/../../link/qos-service-id]/qos:device";
+      }
+    }
+    leaf interface-id {
+      tailf:info "Interface ID";
+      mandatory true;
+      type string;
+    }
+    leaf ip-add {
+      tailf:info "Interface IP address";
+      mandatory true;
+      type inet:ipv4-address;
+    }
+    leaf instance-id {
+      tailf:info "Ethernet service instance ID";
+      mandatory true;
+      type uint32;
+    }
+    leaf vlan-id {
+      tailf:info "VLAN ID";
+      // vlan-range is localy defined type, so link to module not required
+      type vlan-range;
+    }
+  }
+
 
   list l2vpn {
     description "This is an RFS skeleton service";
 
-    key name;
-    leaf name {
+    key service-id;
+    leaf service-id {
       tailf:info "Unique service id";
       tailf:cli-allow-range;
       type string;
     }
 
     uses ncs:service-data;
+    // points to a Python class (??)
     ncs:servicepoint l2vpn-servicepoint;
 
-    // may replace this with other ways of refering to the devices.
-    leaf-list device {
-      type leafref {
-        path "/ncs:devices/ncs:device/ncs:name";
-      }
+    container access-device {
+      // can be configured only when QOS defined
+      when "../link/qos-service-id";
+      tailf:info "L2VPN access PE config";
+      uses device-config;
     }
 
-    // replace with your own stuff here
-    leaf dummy {
-      type inet:ipv4-address;
+    container delivery-device {
+      tailf:info "L2VPN delivery PE config";
+      when "../access-device";
+      uses device-config {
+        refine vlan-id {
+          must "current()=../../access-device/vlan-id";
+        }
+        refine device-id {
+          must "current()!=../../access-device/device-id";
+        }
+      }
+    }
+    container link {
+      tailf:info "L2VPN link config";
+      leaf vc-id {
+        tailf:info "Virtual Circuit ID";
+        mandatory true;
+        type vc-range;
+      }
+      leaf vc-class {
+        tailf:info "VC Class";
+        mandatory true;
+        type string;
+      }
+      leaf qos-service-id {
+        tailf:info "QoS Service instance ID";
+        type leafref {
+          path "/qos:qos/qos:service-id";
+        }
+      }
     }
   }
 }
